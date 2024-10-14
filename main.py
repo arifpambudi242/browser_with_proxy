@@ -96,8 +96,6 @@ chrome_options = Options()
 # Disable bot detection via WebDriver
 chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
 chrome_options.add_experimental_option('useAutomationExtension', False)
-# Disable location detection
-chrome_options.add_argument("--use-fake-ui-for-media-stream")
 
 ''' add spoof location according to proxy IP using IP geolocation 
 https://ipinfo.io/(ip_proxy)/json
