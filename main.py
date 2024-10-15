@@ -67,8 +67,8 @@ chrome.proxy.settings.set(
 chrome.webRequest.onAuthRequired.addListener(
     function(details) {{
         var authCredentials = {{
-            username: "{proxy_username}" if "{proxy_username}" else "",
-            password: "{proxy_password}" if "{proxy_password}" else ""
+            username: "{proxy_username if proxy_username else ""}" ,
+            password: "{proxy_password if proxy_password else ""}"
         }};
         return {{
             authCredentials: authCredentials
@@ -137,9 +137,8 @@ def set_location(latitude, longitude):
     registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Location And Sensors\Location"
     
     try:
-        # Open the registry key with write access
-        with reg.OpenKey(reg.HKEY_CURRENT_USER, registry_path, 0, reg.KEY_SET_VALUE) as key:
-            # Set the latitude and longitude values (as strings)
+        with reg.CreateKeyEx(reg.HKEY_CURRENT_USER, registry_path, 0, reg.KEY_ALL_ACCESS) as key:
+            # Set the latitude and longitude values
             reg.SetValueEx(key, "Latitude", 0, reg.REG_SZ, str(latitude))
             reg.SetValueEx(key, "Longitude", 0, reg.REG_SZ, str(longitude))
             print(f"Default location set to Latitude: {latitude}, Longitude: {longitude}")
@@ -147,7 +146,7 @@ def set_location(latitude, longitude):
         print(f"Failed to set location: {e}")
 
 # Set location
-set_location(latitude, longitude)
+# set_location(latitude, longitude)
 
 driver.refresh()
 # Open pixelscan.net for testing
