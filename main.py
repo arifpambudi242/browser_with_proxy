@@ -91,7 +91,11 @@ with open(os.path.join(extension_folder, "background.js"), "w") as f:
 chrome_options = Options()
 
 # Load extension from the newly created folder
-# chrome_options.add_argument(f"--load-extension={extension_folder}")
+chrome_options.add_argument(f"--load-extension={extension_folder}")
+
+chrome_options.add_experimental_option("prefs", {
+        "profile.default_content_setting_values.geolocation": 1
+    })
 
 # Disable bot detection via WebDriver
 chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
@@ -100,13 +104,13 @@ chrome_options.add_experimental_option('useAutomationExtension', False)
 ''' add spoof location according to proxy IP using IP geolocation 
 https://ipinfo.io/(ip_proxy)/json
 '''
-def get_location(ip):
+
+def get_ip_detail(ip):
     url = f"https://ipinfo.io/{ip}/json"
     response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
-        print(data)
-        return data['loc']
+        return data
     return None
 
 # Set location
@@ -114,6 +118,9 @@ def get_location(ip):
 # Disable headless mode and automation detection
 chrome_options.add_argument('--no-sandbox')
 chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+chrome_options.add_argument('--disable-geolocation --use-mock-location')
+chrome_options.add_argument("--disable-webrtc")
+chrome_options.add_argument("--disable-rtc-smoothness-algorithm")
 
 # Initialize WebDriver with proxy extension
 service = Service()
@@ -127,12 +134,13 @@ driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () =>
 driver.get("https://api4.ipify.org/")
 # 
 ip = driver.find_element(By.TAG_NAME, "body").text
-location = get_location(ip)
+ip_detail = get_ip_detail(ip)
+location = ip_detail.get("loc")
 print(f'your IP {ip}')
 latitude, longitude = location.split(",")
-
+timezone = ip_detail.get("timezone")
 # Set location using Chrome DevTools Protocol (CDP)
-def set_location(latitude, longitude):
+def set_location_using_regedit(latitude, longitude):
     # Define the registry path for location settings
     registry_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Location And Sensors\Location"
     
@@ -145,15 +153,56 @@ def set_location(latitude, longitude):
     except Exception as e:
         print(f"Failed to set location: {e}")
 
-# Set location
-# set_location(latitude, longitude)
+def set_location_java_script(driver,latitude, longitude):
+    driver.execute_script(f"navigator.geolocation.getCurrentPosition = function(success) {{ success({{ coords: {{ latitude: {latitude}, longitude: {longitude} }} }}) }}")
+
+def set_location(driver, latitude, longitude):
+    if type(latitude) is not float or type(longitude) is not float:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    # Set location using Chrome DevTools Protocol (CDP)
+    set_location_using_regedit(latitude, longitude)
+    driver.execute_cdp_cmd("Emulation.setGeolocationOverride", {
+        "latitude": latitude,
+        "longitude": longitude,
+        "accuracy": 100
+    })
+    # set using regedit too
+    # set from javascript too
+    set_location_java_script(driver, latitude, longitude)
+    
+    print(f"Location set to Latitude: {latitude}, Longitude: {longitude}")
+
+def set_timezone(driver, timezone_id):
+    driver.execute_cdp_cmd("Emulation.setTimezoneOverride", {
+        "timezoneId": timezone_id
+    })
+    print(f"Timezone set to {timezone_id}")
+
+
+# set timezone by ip australia
+set_timezone(driver, timezone)
+
+set_location(driver, latitude, longitude)
 
 driver.refresh()
+driver.refresh()
+driver.refresh()
+time.sleep(1)
 # Open pixelscan.net for testing
 driver.get("https://pixelscan.net/")
+# driver.get("https://www.google.com/maps")
+driver.refresh()
+driver.refresh()
+driver.refresh()
 
 # Wait a few seconds to ensure the page is fully loaded
-time.sleep(30)
+while True:
+    try:
+        driver.find_element(By.TAG_NAME, "body")
+        continue
+    except Exception as e:
+        break
 
 # Take a screenshot to ensure detection results
 driver.save_screenshot("pixelscan_test.png")
